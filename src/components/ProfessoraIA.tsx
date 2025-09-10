@@ -2,16 +2,18 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Sparkles, Send, GraduationCap, X, Volume2, VolumeX, Mic, MicOff } from 'lucide-react';
+import { Sparkles, Send, GraduationCap, X, Volume2, VolumeX, Mic, MicOff, Camera } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
+import { ExplainThisPartModal } from './ExplainThisPartModal';
 
 interface Message {
   id: string;
   type: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  imageData?: string;
 }
 
 interface ProfessoraIAProps {
@@ -30,6 +32,7 @@ export const ProfessoraIA = ({ video, livro, area, isOpen, onClose }: Professora
   const [isLoading, setIsLoading] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [showExplainModal, setShowExplainModal] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -80,14 +83,15 @@ Como posso ajudar você hoje?`;
     }
   }, [video, livro, area, isOpen]);
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
+  const sendMessage = async (imageData?: string) => {
+    if ((!inputMessage.trim() && !imageData) || isLoading) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
       type: 'user',
-      content: inputMessage,
-      timestamp: new Date()
+      content: imageData ? 'Pode explicar esta parte?' : inputMessage,
+      timestamp: new Date(),
+      imageData
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -107,13 +111,35 @@ Como posso ajudar você hoje?`;
         contextMessage = `Contexto: O usuário está estudando${area ? ` na área de ${area}` : ' Direito'}.`;
       }
 
-      const { data, error } = await supabase.functions.invoke('gemini-ai-chat', {
-        body: {
-          message: `${contextMessage}
+      let messageToSend = inputMessage;
+      let fileDataToSend = null;
+
+      if (imageData) {
+        messageToSend = `${contextMessage}
+
+Como Professora IA especializada em Direito, analise a imagem anexada e explique de forma didática, clara e amigável o conteúdo mostrado. Se for parte de um livro ou documento jurídico, contextualize com a obra que o usuário está estudando.
+
+Foque especificamente na área selecionada da imagem e forneça uma explicação detalhada dos conceitos apresentados.`;
+
+        // Convert data URL to base64 without prefix
+        const base64Data = imageData.split(',')[1];
+        fileDataToSend = {
+          data: base64Data,
+          mimeType: 'image/png',
+          name: 'screenshot.png'
+        };
+      } else {
+        messageToSend = `${contextMessage}
           
 Como Professora IA especializada em Direito, responda de forma didática, clara e amigável. Use exemplos práticos quando possível e conecte com o conteúdo específico que o usuário está estudando.
 
-Pergunta do usuário: ${inputMessage}`,
+Pergunta do usuário: ${inputMessage}`;
+      }
+
+      const { data, error } = await supabase.functions.invoke('gemini-ai-chat', {
+        body: {
+          message: messageToSend,
+          fileData: fileDataToSend,
           conversationHistory: messages.slice(-5).map(m => ({
             role: m.type === 'user' ? 'user' : 'model',
             content: m.content
@@ -221,6 +247,13 @@ Pergunta do usuário: ${inputMessage}`,
     recognition.start();
   };
 
+  const handleExplainImageSelected = (imageData: string) => {
+    sendMessage(imageData);
+    setShowExplainModal(false);
+  };
+
+  const showExplainButton = livro || area === 'Biblioteca Jurídica';
+
   if (!isOpen) return null;
 
   return (
@@ -247,6 +280,17 @@ Pergunta do usuário: ${inputMessage}`,
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {showExplainButton && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowExplainModal(true)}
+                className="text-white hover:bg-white/10 rounded-full p-2"
+                title="Explicar esta parte"
+              >
+                <Camera className="w-4 h-4" />
+              </Button>
+            )}
             <Button
               variant="ghost"
               size="sm"
@@ -280,6 +324,15 @@ Pergunta do usuário: ${inputMessage}`,
                     : 'bg-white/20 text-white rounded-bl-md'
                 }`}
               >
+                {message.imageData && (
+                  <div className="mb-2">
+                    <img 
+                      src={message.imageData} 
+                      alt="Imagem enviada" 
+                      className="max-w-32 h-auto rounded border"
+                    />
+                  </div>
+                )}
                 <p className="text-sm whitespace-pre-line">{message.content}</p>
               </div>
             </div>
@@ -318,7 +371,7 @@ Pergunta do usuário: ${inputMessage}`,
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </Button>
             <Button
-              onClick={sendMessage}
+              onClick={() => sendMessage()}
               className="bg-white/30 hover:bg-white/40 text-white border-white/40 shrink-0"
               size="sm"
               disabled={!inputMessage.trim() || isLoading}
@@ -327,6 +380,12 @@ Pergunta do usuário: ${inputMessage}`,
             </Button>
           </div>
         </div>
+
+        <ExplainThisPartModal
+          isOpen={showExplainModal}
+          onClose={() => setShowExplainModal(false)}
+          onImageSelected={handleExplainImageSelected}
+        />
       </div>
     </div>
   );
