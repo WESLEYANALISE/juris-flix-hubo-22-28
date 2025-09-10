@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { ExplainThisPartModal } from './ExplainThisPartModal';
+import { useVoiceRecording } from '@/hooks/useVoiceRecording';
 
 interface Message {
   id: string;
@@ -31,10 +32,17 @@ export const ProfessoraIA = ({ video, livro, area, isOpen, onClose }: Professora
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [audioEnabled, setAudioEnabled] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [showExplainModal, setShowExplainModal] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  
+  const { 
+    isRecording, 
+    isTranscribing, 
+    startRecording, 
+    stopRecording, 
+    canRecord 
+  } = useVoiceRecording();
 
   // Mensagem inicial da professora baseada no contexto
   useEffect(() => {
@@ -199,52 +207,17 @@ Pergunta do usuário: ${inputMessage}`;
     }
   };
 
-  const toggleVoiceRecognition = () => {
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      toast({
-        title: "Recurso não disponível",
-        description: "Reconhecimento de voz não é suportado neste navegador.",
-        variant: "destructive"
-      });
-      return;
+  const handleVoiceRecording = async () => {
+    if (isRecording) {
+      // Parar gravação e transcrever
+      const transcriptionText = await stopRecording();
+      if (transcriptionText) {
+        setInputMessage(transcriptionText);
+      }
+    } else {
+      // Iniciar gravação
+      await startRecording();
     }
-
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
-
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    const recognition = new SpeechRecognition();
-    
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.lang = 'pt-BR';
-
-    recognition.onstart = () => {
-      setIsListening(true);
-    };
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setInputMessage(transcript);
-      setIsListening(false);
-    };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-      toast({
-        title: "Erro no reconhecimento",
-        description: "Não foi possível reconhecer sua voz. Tente novamente.",
-        variant: "destructive"
-      });
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
-    recognition.start();
   };
 
   const handleExplainImageSelected = (imageData: string) => {
@@ -356,20 +329,38 @@ Pergunta do usuário: ${inputMessage}`;
             <Input
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Digite sua dúvida sobre a videoaula..."
+              placeholder={livro ? "Digite sua dúvida sobre o livro..." : "Digite sua dúvida sobre a videoaula..."}
               className="flex-1 bg-white/20 border-white/30 text-white placeholder:text-white/60 text-sm"
               onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
               disabled={isLoading}
             />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleVoiceRecognition}
-              className={`text-white hover:bg-white/10 shrink-0 ${isListening ? 'bg-red-500/20' : ''}`}
-              disabled={isLoading}
-            >
-              {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </Button>
+            
+            {canRecord && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onMouseDown={handleVoiceRecording}
+                onMouseUp={handleVoiceRecording}
+                onTouchStart={handleVoiceRecording}
+                onTouchEnd={handleVoiceRecording}
+                className={`text-white hover:bg-white/10 shrink-0 transition-colors ${
+                  isRecording ? 'bg-red-500/30 text-red-200' : ''
+                } ${
+                  isTranscribing ? 'bg-blue-500/30 text-blue-200' : ''
+                }`}
+                disabled={isLoading || isTranscribing}
+                title={isRecording ? "Solte para parar" : "Pressione e segure para gravar"}
+              >
+                {isTranscribing ? (
+                  <Sparkles className="w-4 h-4 animate-spin" />
+                ) : isRecording ? (
+                  <MicOff className="w-4 h-4 animate-pulse" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </Button>
+            )}
+            
             <Button
               onClick={() => sendMessage()}
               className="bg-white/30 hover:bg-white/40 text-white border-white/40 shrink-0"
