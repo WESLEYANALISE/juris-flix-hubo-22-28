@@ -13,7 +13,9 @@ const CategoryAccessSection = memo(() => {
     isTablet,
     isMobile
   } = useDeviceDetection();
-  const { profile } = useAuth();
+  const {
+    profile
+  } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<typeof categories[0] | null>(null);
   const categories = useMemo(() => [{
     id: 1,
@@ -81,11 +83,7 @@ const CategoryAccessSection = memo(() => {
         {/* Header Section - Animação Lottie */}
         <div className="text-center mb-2">
           <div className="w-full max-w-md mx-auto">
-            <iframe 
-              src="https://lottie.host/embed/4cf4ee37-a511-4357-a3ff-fa2115251444/oXRRrHCU8q.lottie"
-              className="w-full h-32 border-0"
-              title="Animação de Justiça"
-            />
+            <iframe src="https://lottie.host/embed/4cf4ee37-a511-4357-a3ff-fa2115251444/oXRRrHCU8q.lottie" className="w-full h-32 border-0" title="Animação de Justiça" />
           </div>
         </div>
 
@@ -139,7 +137,7 @@ const CategoryAccessSection = memo(() => {
 
         {/* Helper text */}
         <div className="text-center mt-8">
-          <p className="text-muted-foreground text-sm px-0 mx-[3px] my-[14px] py-[2px]">💡 Dica: Clique em qualquer categoria para ver as o</p>
+          <p className="text-muted-foreground text-sm px-0 mx-[3px] my-[14px] py-[2px]">💡 Dica: Em caso de dúvidas, pergunte à professora.</p>
         </div>
       </div>
 
