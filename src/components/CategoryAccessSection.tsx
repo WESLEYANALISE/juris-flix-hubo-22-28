@@ -137,7 +137,7 @@ const CategoryAccessSection = memo(() => {
 
         {/* Helper text */}
         <div className="text-center mt-8">
-          <p className="text-muted-foreground text-sm px-0 mx-[3px] my-[14px] py-[2px]">💡 Dica: Em caso de dúvidas, pergunte à professora.</p>
+          <p className="text-muted-foreground text-sm px-0 mx-[3px] my-[14px] py-[2px]">💡 Na dúvida, pergunte à professora.</p>
         </div>
       </div>
 
